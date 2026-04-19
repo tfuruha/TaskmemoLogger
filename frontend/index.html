@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="業務タスクをチャット感覚で素早く記録し、生成AIに要約させるためのデスクトップアプリ" />
+  <title>TaskmemoLogger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <main class="chat-area" id="chatArea" aria-label="本日のタスク履歴">
+      <div class="chat-empty" id="chatEmpty">
+        <p>本日のタスクはまだありません</p>
+        <p class="chat-empty-sub">下の入力欄からタスクを記録してください</p>
+      </div>
+    </main>
+
+    <!-- Input panel -->
+    <footer class="input-panel">
+      <!-- Tag input row -->
+      <div class="tag-input-row">
+        <div class="tag-pills-area" id="tagPillsArea" aria-label="選択済みタグ">
+          <!-- Pills and input will be rendered here by JS -->
+          <input
+            id="tagInput"
+            class="tag-input-field"
+            type="text"
+            placeholder="タグを入力..."
+            autocomplete="off"
+            autofocus
+            aria-label="タグ入力"
+            aria-autocomplete="list"
+            aria-controls="suggestionList"
+          />
+        </div>
+        <!-- Suggestion dropdown -->
+        <ul id="suggestionList" class="suggestion-list" role="listbox" aria-label="タグ候補" hidden></ul>
+      </div>
+
+      <!-- Task text area -->
+      <div class="task-input-row">
+        <textarea
+          id="taskInput"
+          class="task-textarea"
+          placeholder="タスク内容を入力... (Ctrl+Enter で保存して閉じる)"
+          rows="4"
+          aria-label="タスク内容"
+        ></textarea>
+      </div>
+
+      <!-- Submit row -->
+      <div class="submit-row">
+        <span class="hint-text" id="hintText"></span>
+        <button id="submitBtn" class="submit-btn" aria-label="保存して閉じる">
+          保存して閉じる
+          <kbd>Ctrl+↵</kbd>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="./src/main.js" type="module"></script>
+</body>
+</html>
