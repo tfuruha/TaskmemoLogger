@@ -20,6 +20,7 @@ vendor/
 
 # User specific / old docs
 doc/implementation_plan*.md
+doc/report/
 
 # OS specific
 .DS_Store

@@ -21,8 +21,8 @@ Markdown ログを生成する「Fire & Forget 型」アプリケーションで
 
 ## セットアップ
 
-1. [Releases](.) から `TaskmemoLogger.exe` をダウンロードします
-2. 任意のフォルダに配置して実行します
+1. [GitHub Releases (最新版)](https://github.com/tfuruha/TaskmemoLogger/releases/latest) から `TaskmemoLogger.exe` をダウンロードします  
+2. ダウンロードしたファイルを任意のフォルダに配置して実行します
 3. 初回起動時、以下のフォルダが自動的に作成されます:
    - `%USERPROFILE%\Documents\TaskmemoLogger\` — タグ候補データ・ログ（同一フォルダ配下に統合）
 
