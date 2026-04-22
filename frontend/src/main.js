@@ -28,12 +28,13 @@ let suggestionIndex = -1;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
-  await loadTodayLogs();
-
   // Go側のOnDomReadyからWindowShow完了後に発火されるイベントを待ち受ける
+  // データロードより先に登録しておくことで、タイミングによる取りこぼしを防ぐ
   EventsOn('app:ready-focus', () => {
     focusTagInput();
   });
+
+  await loadTodayLogs();
 });
 
 // ウィンドウがOSからフォーカスを獲得した時（Alt+Tab等での復帰時）
@@ -42,18 +43,14 @@ window.addEventListener('focus', () => {
 });
 
 /**
- * タグ入力欄にフォーカスを当て、キャレットを確実に表示させるヘルパー。
- * taskInputに既にフォーカスがある場合は邪魔をしない。
+ * タグ入力欄にフォーカスを当て、キャレットを表示させるヘルパー。
+ * Win32レベルでOSのキーボードフォーカスが既に確保されている前提のため、
+ * blur() や requestAnimationFrame 等のハックなしで直接フォーカスする。
  */
 function focusTagInput() {
   if (document.activeElement === taskInput) return;
-  tagInput.blur();
-  // requestAnimationFrameで次描画フレームまで待機し、
-  // WebView2のレンダリングパイプラインとフォーカス状態を同期させる
-  requestAnimationFrame(() => {
-    tagInput.focus();
-    tagInput.select(); // select()でキャレットレンダリングを強制
-  });
+  tagInput.focus();
+  tagInput.select(); // select()でキャレットレンダリングを確実に促す
 }
 
 // ── Load today's logs into chat history ───────────────────────────────────────

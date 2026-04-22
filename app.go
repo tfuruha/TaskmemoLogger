@@ -54,14 +54,15 @@ func (a *App) domReady(ctx context.Context) {
 	// 1. Show the window at the OS level.
 	wailsRuntime.WindowShow(ctx)
 
-	// 2. Force Win32 keyboard focus directly onto the WebView2 HWND.
-	//    This resolves the "ghost focus" issue where the embedded Chrome
-	//    engine doesn't receive OS-level keyboard input after startup.
-	forceWebView2Focus("TaskmemoLogger")
+	// 2. ゴルーチンで非同期に実行し、メインスレッド（UIスレッド）をブロックしない。
+	//    これによりWebView2の子ウィンドウ生成プロセスを阻害せず、即座にフォーカスを奪取できる。
+	go func() {
+		// Win32レベルでWebView2の子ウィンドウに直接キーボードフォーカスを当てる
+		forceWebView2Focus("TaskmemoLogger")
 
-	// 3. Signal frontend to call element.focus() now that the OS-level
-	//    focus is correctly on the WebView2 control.
-	wailsRuntime.EventsEmit(ctx, "app:ready-focus")
+		// 3. フロントエンドに対し、DOMレベルでのフォーカス（キャレット表示）を指示する。
+		wailsRuntime.EventsEmit(ctx, "app:ready-focus")
+	}()
 }
 
 // SaveLog saves a task entry to the Markdown log file and persists any new tags.
