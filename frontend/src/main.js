@@ -167,6 +167,9 @@ tagInput.addEventListener('input', async () => {
 });
 
 tagInput.addEventListener('keydown', e => {
+  // IME入力中（変換の確定など）のキーイベントは無視する
+  if (e.isComposing) return;
+
   if (suggestionList.hidden) {
     if (e.key === 'Enter' && tagInput.value.trim()) {
       e.preventDefault();
@@ -179,6 +182,10 @@ tagInput.addEventListener('keydown', e => {
     }
     if (e.key === 'Tab') {
       e.preventDefault();
+      const pendingTag = tagInput.value.trim();
+      if (pendingTag) {
+        addTag(pendingTag);
+      }
       taskInput.focus();
       return;
     }
@@ -206,6 +213,10 @@ tagInput.addEventListener('keydown', e => {
   } else if (e.key === 'Tab') {
     e.preventDefault();
     hideSuggestions();
+    const pendingTag = tagInput.value.trim();
+    if (pendingTag) {
+      addTag(pendingTag);
+    }
     taskInput.focus();
   }
 });
@@ -263,6 +274,12 @@ document.addEventListener('mousedown', e => {
 
 // ── Submit ────────────────────────────────────────────────────────────────────
 async function submit() {
+  // 未確定のタグがあれば追加する
+  const pendingTag = tagInput.value.trim();
+  if (pendingTag) {
+    addTag(pendingTag);
+  }
+
   const text = taskInput.value.trim();
   if (!text) {
     hintText.textContent = 'タスク内容を入力してください';

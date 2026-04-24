@@ -139,10 +139,13 @@ DOMContentLoaded
 window 'focus' イベント（Alt+Tab 復帰時など）
   → focusTagInput()
 
-tagInput keyup
+tagInput keydown
+  → (e.isComposing なら無視：IME確定時の誤動作防止)
   → GetTagSuggestions(prefix) → <ul> を更新
+  → Tab キー押下時：未確定テキストがあれば addTag() で Pill 化してからフォーカス移動
 
 submitBtn click / Ctrl+Enter
+  → 未確定テキストがあれば addTag() で Pill 化（保存漏れ防止）
   → SaveLog(tags, text)  // Go 側で Append + Add を順次実行
   → Quit()               // アプリ終了
 ```
@@ -259,6 +262,14 @@ JS 側は `EventsOn('app:ready-focus')` を受けて `requestAnimationFrame` 内
 
 `GetCurrentThreadId` は `kernel32.dll` に属するため、`user32.dll` ではなく
 `kernel32.dll` から呼び出す必要がある点に注意する。
+
+### タグ入力のUX設計と未確定テキストの取り扱い
+
+タグ入力欄（`tagInput`）において、ユーザーが Enter キーで明示的に Pill 化（確定）させずに保存アクションやフォーカス移動を行った場合でも、入力中の内容が失われないよう以下のロジックを実装している。
+
+- **保存時の自動確定**: `submit()` 実行時に `tagInput` にテキストが残っている場合、それを自動的にタグとして追加してからバックエンドへ送信する。これにより、タグ入力直後の `Ctrl+Enter` でも保存漏れが発生しない。
+- **フォーカス移動時の自動確定**: `Tab` キーでタスク入力欄（`taskInput`）に移動する際、入力中のテキストがあれば自動的に Pill 化する。
+- **IME確定時の誤動作防止**: 日本語 IME での変換確定のための Enter キー押下時に、意図せずタグが Pill 化（確定）されないよう、`e.isComposing` フラグを用いて `keydown` イベントを制御している。
 
 ## 6. テスト設計
 
