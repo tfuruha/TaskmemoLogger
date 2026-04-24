@@ -41,7 +41,24 @@ var (
 	procGetWindowThreadPID = user32dll.NewProc("GetWindowThreadProcessId")
 	// GetCurrentThreadId は kernel32.dll に存在する（user32.dll ではない）
 	procGetCurrentThreadID = kernel32dll.NewProc("GetCurrentThreadId")
+
+	// コールバックは一度だけ作成して再利用する（Goの仕様上、生成されたコールバックはGCされないため）
+	enumChildWindowsCallback uintptr
+	foundWebView2Child       uintptr
 )
+
+func init() {
+	enumChildWindowsCallback = syscall.NewCallback(func(child, _ uintptr) uintptr {
+		buf := make([]uint16, 256)
+		procGetClassNameW.Call(child, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+		className := windows.UTF16ToString(buf)
+		if className == "Chrome_WidgetWin_1" {
+			foundWebView2Child = child
+			return 0 // stop enumeration
+		}
+		return 1 // continue
+	})
+}
 
 const swShow = uintptr(5)
 
@@ -61,9 +78,9 @@ func forceWebView2Focus(windowTitle string) {
 		return
 	}
 
-	// Ensure it is visible and in the foreground.
-	procShowWindow.Call(hwnd, swShow)
-	procSetForegroundWin.Call(hwnd)
+	// NOTE: procShowWindow and procSetForegroundWin are redundant here
+	// because wailsRuntime.WindowShow(ctx) was called just before this
+	// asynchronous task started.
 
 	// AttachThreadInput so our goroutine can call SetFocus().
 	// Without this, SetFocus() from a different thread is silently ignored.
@@ -77,13 +94,14 @@ func forceWebView2Focus(windowTitle string) {
 	// Enumerate child windows to find the WebView2 Chromium host.
 	// We retry up to ~500 ms because Chrome_WidgetWin_1 may not exist yet
 	// immediately after ShowWindow.
+	// ポーリング間隔を 10ms に短縮し、即応性を向上させる。
 	var target uintptr
-	for range 10 {
+	for range 50 {
 		target = findWebView2Child(hwnd)
 		if target != 0 {
 			break
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	if target != 0 {
@@ -94,20 +112,7 @@ func forceWebView2Focus(windowTitle string) {
 // findWebView2Child enumerates children of hwnd and returns the first HWND
 // whose Win32 class name is "Chrome_WidgetWin_1" (WebView2 host).
 func findWebView2Child(hwnd uintptr) uintptr {
-	var found uintptr
-
-	// EnumChildWindows callback — must be a syscall.NewCallback.
-	cb := syscall.NewCallback(func(child, _ uintptr) uintptr {
-		buf := make([]uint16, 256)
-		procGetClassNameW.Call(child, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
-		className := windows.UTF16ToString(buf)
-		if className == "Chrome_WidgetWin_1" {
-			found = child
-			return 0 // stop enumeration
-		}
-		return 1 // continue
-	})
-
-	procEnumChildWindows.Call(hwnd, cb, 0)
-	return found
+	foundWebView2Child = 0
+	procEnumChildWindows.Call(hwnd, enumChildWindowsCallback, 0)
+	return foundWebView2Child
 }

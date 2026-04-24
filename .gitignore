@@ -20,6 +20,7 @@ vendor/
 
 # User specific / old docs
 doc/implementation_plan*.md
+doc/Draft
 doc/report/
 
 # OS specific
@@ -42,3 +43,7 @@ desktop.ini
 *~
 .tmp/
 .temp/
+GEMINI.md
+AGENTS.md
+CLAUDE.md
+.agent/
