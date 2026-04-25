@@ -103,3 +103,10 @@ wails build
 - [仕様書 (doc/specification.md)](doc/specification.md)
 - [設計書 (doc/design.md)](doc/design.md)
 - [旧 Python 版仕様書 (doc_org/)](doc_org/)
+
+## ライセンス
+
+[MIT License](LICENSE)
+
+&copy; 2026 tfuruha
+
