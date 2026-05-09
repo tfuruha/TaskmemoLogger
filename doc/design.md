@@ -72,12 +72,25 @@ func (l *TaskLogger) ReadToday() ([]LogEntry, error) // 今月ファイルから
 ### `tags_manager.go` — タグ永続化層
 
 ```go
-type TagsManager struct { filePath string }
+type TagsManager struct {
+    filePath string
+    tags     []string // インメモリキャッシュ（起動時に一度だけ Load）
+}
 
-func (t *TagsManager) Load() ([]string, error)
-func (t *TagsManager) Add(tag string) error         // 重複排除（大小文字非区別）+ 原子書き込み
-func (t *TagsManager) GetSuggestions(prefix string) []string // 前方一致検索
+func NewTagsManager(dataDir string) (*TagsManager, error) // 初期化時に Load() を呼びキャッシュ構築
+func (t *TagsManager) Load() ([]string, error)            // ディスクから読み込む（初期化・テスト用）
+func (t *TagsManager) Add(tag string) error               // 重複排除 + 原子書き込み + キャッシュ更新
+func (t *TagsManager) GetSuggestions(prefix string) []string // インメモリキャッシュで前方一致検索
 ```
+
+#### Write-through キャッシュ戦略
+
+`NewTagsManager` 初期化時に `Load()` を1回呼び、結果を `tags` フィールドに保持する。
+以降の操作はすべてインメモリで完結し、`Add` 時のみディスクに書く。
+
+- `GetSuggestions`: `t.tags` を直接検索（ディスクIOなし）
+- `Add`: `t.tags` で重複チェック → `save()` 成功後に `t.tags` を更新
+  - `save()` 失敗時はキャッシュを更新しないため、ディスクとの不一致は発生しない
 
 #### 原子書き込み（Rename 方式）
 

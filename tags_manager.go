@@ -13,6 +13,7 @@ import (
 // so users can hand-edit it if needed.
 type TagsManager struct {
 	filePath string
+	tags     []string // in-memory cache; kept in sync with tags.json
 }
 
 // NewTagsManager creates a TagsManager. dataDir is the directory holding tags.json.
@@ -26,7 +27,15 @@ func NewTagsManager(dataDir string) (*TagsManager, error) {
 		if err := tm.save([]string{}); err != nil {
 			return nil, err
 		}
+		tm.tags = []string{}
+		return tm, nil
 	}
+	// Load once into memory cache
+	tags, err := tm.Load()
+	if err != nil {
+		return nil, err
+	}
+	tm.tags = tags
 	return tm, nil
 }
 
@@ -65,39 +74,39 @@ func (t *TagsManager) save(tags []string) error {
 }
 
 // Add adds a new tag if it does not already exist (case-insensitive dedup).
-// Saves atomically.
+// Saves atomically. Updates the in-memory cache only after a successful save.
 func (t *TagsManager) Add(tag string) error {
 	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return nil
 	}
-	tags, err := t.Load()
-	if err != nil {
-		return err
-	}
-	// Case-insensitive duplicate check
+	// Case-insensitive duplicate check against cache
 	tagLower := strings.ToLower(tag)
-	for _, existing := range tags {
+	for _, existing := range t.tags {
 		if strings.ToLower(existing) == tagLower {
 			return nil // already exists
 		}
 	}
-	tags = append(tags, tag)
-	return t.save(tags)
+	newTags := append(t.tags, tag)
+	// Update cache only after successful atomic save
+	if err := t.save(newTags); err != nil {
+		return err
+	}
+	t.tags = newTags
+	return nil
 }
 
 // GetSuggestions returns tags whose prefix matches (case-insensitive).
+// Uses the in-memory cache; no disk I/O.
 func (t *TagsManager) GetSuggestions(prefix string) []string {
-	tags, err := t.Load()
-	if err != nil {
-		return []string{}
-	}
 	if prefix == "" {
-		return tags
+		result := make([]string, len(t.tags))
+		copy(result, t.tags)
+		return result
 	}
 	prefixLower := strings.ToLower(prefix)
 	var result []string
-	for _, tag := range tags {
+	for _, tag := range t.tags {
 		if strings.HasPrefix(strings.ToLower(tag), prefixLower) {
 			result = append(result, tag)
 		}
