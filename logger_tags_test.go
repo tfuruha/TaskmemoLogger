@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,4 +172,118 @@ func TestTagsManager_EmptyTag(t *testing.T) {
 	if len(tags) != 0 {
 		t.Errorf("empty tag should not be saved, got %v", tags)
 	}
+}
+
+// ---- ReadRecent tests ----
+
+func TestTaskLogger_ReadRecent_CurrentMonthOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := NewTaskLogger(tmpDir)
+
+	now := time.Now()
+	for i := 0; i < 5; i++ {
+		_ = logger.Append(LogEntry{
+			Timestamp: now.Format("2006-01-02 15:04"),
+			Tags:      []string{"テスト"},
+			Text:      fmt.Sprintf("エントリ%d", i+1),
+		})
+	}
+
+	entries, err := logger.ReadRecent(recentLogLimit)
+	if err != nil {
+		t.Fatalf("ReadRecent: %v", err)
+	}
+	if len(entries) != 5 {
+		t.Errorf("expected 5 entries, got %d", len(entries))
+	}
+}
+
+func TestTaskLogger_ReadRecent_LimitApplied(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := NewTaskLogger(tmpDir)
+
+	now := time.Now()
+	for i := 0; i < 25; i++ {
+		_ = logger.Append(LogEntry{
+			Timestamp: now.Format("2006-01-02 15:04"),
+			Tags:      nil,
+			Text:      fmt.Sprintf("エントリ%d", i+1),
+		})
+	}
+
+	entries, err := logger.ReadRecent(recentLogLimit)
+	if err != nil {
+		t.Fatalf("ReadRecent: %v", err)
+	}
+	if len(entries) != recentLogLimit {
+		t.Errorf("expected %d entries, got %d", recentLogLimit, len(entries))
+	}
+	// 最新 recentLogLimit 件であることを確認（最後のエントリのテキストで検証）
+	last := entries[len(entries)-1]
+	if last.Text != fmt.Sprintf("エントリ%d", 25) {
+		t.Errorf("last entry should be エントリ25, got %q", last.Text)
+	}
+}
+
+func TestTaskLogger_ReadRecent_CrossMonth(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := NewTaskLogger(tmpDir)
+
+	now := time.Now()
+	prevMonth := now.AddDate(0, -1, 0)
+
+	// 前月ファイルに直接３件書き込む
+	prevPath := logger.logFilePathFor(prevMonth)
+	for i := 0; i < 3; i++ {
+		_ = appendToPath(prevPath, prevMonth.Format("2006-01-02 15:04"), fmt.Sprintf("前月エントリ%d", i+1))
+	}
+	// 今月に5件
+	for i := 0; i < 5; i++ {
+		_ = logger.Append(LogEntry{
+			Timestamp: now.Format("2006-01-02 15:04"),
+			Tags:      nil,
+			Text:      fmt.Sprintf("今月エントリ%d", i+1),
+		})
+	}
+
+	entries, err := logger.ReadRecent(recentLogLimit)
+	if err != nil {
+		t.Fatalf("ReadRecent: %v", err)
+	}
+	// 合計8件（20件未満なので全件返る）
+	if len(entries) != 8 {
+		t.Errorf("expected 8 entries (3 prev + 5 current), got %d", len(entries))
+	}
+	// 先頭は前月、末尾は今月
+	if entries[0].Text != "前月エントリ1" {
+		t.Errorf("first entry should be 前月エントリ1, got %q", entries[0].Text)
+	}
+	if entries[7].Text != "今月エントリ5" {
+		t.Errorf("last entry should be 今月エントリ5, got %q", entries[7].Text)
+	}
+}
+
+func TestTaskLogger_ReadRecent_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := NewTaskLogger(tmpDir)
+
+	entries, err := logger.ReadRecent(recentLogLimit)
+	if err != nil {
+		t.Fatalf("ReadRecent on empty dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(entries))
+	}
+}
+
+// appendToPath は指定パスへ直接エントリを書き込むテスト用ヘルパー。
+func appendToPath(path, timestamp, text string) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	block := fmt.Sprintf("\n## %s\n- %s\n", timestamp, text)
+	_, err = f.WriteString(block)
+	return err
 }

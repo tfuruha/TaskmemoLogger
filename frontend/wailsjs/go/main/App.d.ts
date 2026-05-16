@@ -4,8 +4,8 @@ import {main} from '../models';
 
 export function AddTag(arg1:string):Promise<void>;
 
-export function GetTagSuggestions(arg1:string):Promise<Array<string>>;
+export function GetRecentLogs():Promise<Array<main.LogEntry>>;
 
-export function GetTodayLogs():Promise<Array<main.LogEntry>>;
+export function GetTagSuggestions(arg1:string):Promise<Array<string>>;
 
 export function SaveLog(arg1:Array<string>,arg2:string):Promise<void>;

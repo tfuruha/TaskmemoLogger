@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+// recentLogLimit is the maximum number of log entries returned by ReadRecent.
+// This is a compile-time constant; change here to adjust the history window.
+const recentLogLimit = 20
+
 // LogEntry represents a single task log record.
 type LogEntry struct {
 	Timestamp string   `json:"timestamp"`
@@ -32,8 +36,12 @@ func NewTaskLogger(logDir string) (*TaskLogger, error) {
 
 // logFilePath returns the current month's log file path.
 func (l *TaskLogger) logFilePath() string {
-	month := time.Now().Format("2006-01")
-	return filepath.Join(l.logDir, month+"_log.md")
+	return l.logFilePathFor(time.Now())
+}
+
+// logFilePathFor returns the log file path for the month containing t.
+func (l *TaskLogger) logFilePathFor(t time.Time) string {
+	return filepath.Join(l.logDir, t.Format("2006-01")+"_log.md")
 }
 
 // Append writes a new LogEntry to the Markdown log file.
@@ -77,11 +85,9 @@ func (l *TaskLogger) Append(entry LogEntry) error {
 	return err
 }
 
-// ReadToday parses today's entries from the current month's log file.
-func (l *TaskLogger) ReadToday() ([]LogEntry, error) {
-	today := time.Now().Format("2006-01-02")
-	path := l.logFilePath()
-
+// readAllFromFile parses all entries from a single log file.
+// Returns an empty slice (no error) if the file does not exist.
+func (l *TaskLogger) readAllFromFile(path string) ([]LogEntry, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -105,9 +111,7 @@ func (l *TaskLogger) ReadToday() ([]LogEntry, error) {
 			// Save previous entry
 			if current != nil {
 				current.Text = strings.TrimRight(strings.Join(bodyLines, "\n"), "\n")
-				if strings.HasPrefix(current.Timestamp, today) {
-					entries = append(entries, *current)
-				}
+				entries = append(entries, *current)
 			}
 			current = &LogEntry{Timestamp: m[1]}
 			bodyLines = nil
@@ -137,10 +141,55 @@ func (l *TaskLogger) ReadToday() ([]LogEntry, error) {
 	// Save last entry
 	if current != nil {
 		current.Text = strings.TrimRight(strings.Join(bodyLines, "\n"), "\n")
-		if strings.HasPrefix(current.Timestamp, today) {
-			entries = append(entries, *current)
-		}
+		entries = append(entries, *current)
 	}
 
 	return entries, scanner.Err()
+}
+
+// ReadToday parses today's entries from the current month's log file.
+func (l *TaskLogger) ReadToday() ([]LogEntry, error) {
+	today := time.Now().Format("2006-01-02")
+	all, err := l.readAllFromFile(l.logFilePath())
+	if err != nil {
+		return nil, err
+	}
+	var entries []LogEntry
+	for _, e := range all {
+		if strings.HasPrefix(e.Timestamp, today) {
+			entries = append(entries, e)
+		}
+	}
+	if entries == nil {
+		return []LogEntry{}, nil
+	}
+	return entries, nil
+}
+
+// ReadRecent returns the latest n entries across the current and previous month's log files.
+// If fewer than n entries exist in total, all available entries are returned.
+func (l *TaskLogger) ReadRecent(n int) ([]LogEntry, error) {
+	candidates := []string{
+		l.logFilePathFor(time.Now()),
+		l.logFilePathFor(time.Now().AddDate(0, -1, 0)),
+	}
+
+	var all []LogEntry
+	for _, path := range candidates {
+		entries, err := l.readAllFromFile(path)
+		if err != nil {
+			return nil, err
+		}
+		// Prepend older entries to maintain chronological order
+		all = append(entries, all...)
+		if len(all) >= n {
+			break
+		}
+	}
+
+	// Return the latest n entries
+	if len(all) > n {
+		all = all[len(all)-n:]
+	}
+	return all, nil
 }

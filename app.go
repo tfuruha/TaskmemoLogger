@@ -90,12 +90,12 @@ func (a *App) SaveLog(tags []string, text string) error {
 	return nil
 }
 
-// GetTodayLogs returns today's log entries for the chat history view.
-func (a *App) GetTodayLogs() ([]LogEntry, error) {
+// GetRecentLogs returns the latest recentLogLimit log entries for the chat history view.
+func (a *App) GetRecentLogs() ([]LogEntry, error) {
 	if a.logger == nil {
 		return nil, fmt.Errorf("app not initialised")
 	}
-	return a.logger.ReadToday()
+	return a.logger.ReadRecent(recentLogLimit)
 }
 
 // GetTagSuggestions returns tags matching the given prefix.

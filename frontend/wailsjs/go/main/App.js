@@ -6,12 +6,12 @@ export function AddTag(arg1) {
   return window['go']['main']['App']['AddTag'](arg1);
 }
 
-export function GetTagSuggestions(arg1) {
-  return window['go']['main']['App']['GetTagSuggestions'](arg1);
+export function GetRecentLogs() {
+  return window['go']['main']['App']['GetRecentLogs']();
 }
 
-export function GetTodayLogs() {
-  return window['go']['main']['App']['GetTodayLogs']();
+export function GetTagSuggestions(arg1) {
+  return window['go']['main']['App']['GetTagSuggestions'](arg1);
 }
 
 export function SaveLog(arg1, arg2) {
