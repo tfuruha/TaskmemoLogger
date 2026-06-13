@@ -287,3 +287,71 @@ func appendToPath(path, timestamp, text string) error {
 	_, err = f.WriteString(block)
 	return err
 }
+
+// ---- App tests ----
+
+func TestApp_SaveLogWithOffset(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := NewTaskLogger(tmpDir)
+	tagsMgr, _ := NewTagsManager(tmpDir)
+
+	app := &App{
+		logger:      logger,
+		tagsManager: tagsMgr,
+	}
+
+	// 15分前のオフセットで保存
+	err := app.SaveLog([]string{"テスト"}, "オフセットテスト", -15)
+	if err != nil {
+		t.Fatalf("SaveLog: %v", err)
+	}
+
+	entries, err := logger.ReadToday()
+	if err != nil {
+		t.Fatalf("ReadToday: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+
+	expectedTime := time.Now().Add(-15 * time.Minute).Format("2006-01-02 15:04")
+	if entries[0].Timestamp != expectedTime {
+		t.Errorf("timestamp mismatch: want %q, got %q", expectedTime, entries[0].Timestamp)
+	}
+}
+
+func TestApp_SaveWorkStart(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := NewTaskLogger(tmpDir)
+	tagsMgr, _ := NewTagsManager(tmpDir)
+
+	app := &App{
+		logger:      logger,
+		tagsManager: tagsMgr,
+	}
+
+	// 30分前のオフセットで始業保存
+	err := app.SaveWorkStart(-30)
+	if err != nil {
+		t.Fatalf("SaveWorkStart: %v", err)
+	}
+
+	entries, err := logger.ReadToday()
+	if err != nil {
+		t.Fatalf("ReadToday: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+
+	expectedTime := time.Now().Add(-30 * time.Minute).Format("2006-01-02 15:04")
+	if entries[0].Timestamp != expectedTime {
+		t.Errorf("timestamp mismatch: want %q, got %q", expectedTime, entries[0].Timestamp)
+	}
+	if len(entries[0].Tags) != 1 || entries[0].Tags[0] != "始業" {
+		t.Errorf("tags mismatch: want [始業], got %v", entries[0].Tags)
+	}
+	if entries[0].Text != "始業" {
+		t.Errorf("text mismatch: want %q, got %q", "始業", entries[0].Text)
+	}
+}

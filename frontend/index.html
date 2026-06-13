@@ -54,7 +54,19 @@
       </div>
 
       <!-- Submit row -->
-      <div class="submit-row">
+      <div class="action-bar">
+        <button id="workStartBtn" class="work-start-btn" aria-label="始業時刻を記録">
+          始業
+        </button>
+        <div class="time-offset-group">
+          <label for="timeOffset" class="time-offset-label">記録時刻</label>
+          <select id="timeOffset" class="time-offset-select" aria-label="記録時刻の調整">
+            <option value="0">今</option>
+            <option value="-15">-15分</option>
+            <option value="-30">-30分</option>
+            <option value="-60">-60分</option>
+          </select>
+        </div>
         <span class="hint-text" id="hintText"></span>
         <button id="submitBtn" class="submit-btn" aria-label="保存して閉じる">
           保存して閉じる

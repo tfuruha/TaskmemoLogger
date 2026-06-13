@@ -67,12 +67,14 @@ func (a *App) domReady(ctx context.Context) {
 
 // SaveLog saves a task entry to the Markdown log file and persists any new tags.
 // This is called by the frontend on submit.
-func (a *App) SaveLog(tags []string, text string) error {
+// offsetMinutes: 記録時刻を現在時刻から遡及調整するオフセット値（分）
+func (a *App) SaveLog(tags []string, text string, offsetMinutes int) error {
 	if a.logger == nil || a.tagsManager == nil {
 		return fmt.Errorf("app not initialised")
 	}
+	t := time.Now().Add(time.Duration(offsetMinutes) * time.Minute)
 	entry := LogEntry{
-		Timestamp: time.Now().Format("2006-01-02 15:04"),
+		Timestamp: t.Format("2006-01-02 15:04"),
 		Tags:      tags,
 		Text:      text,
 	}
@@ -88,6 +90,22 @@ func (a *App) SaveLog(tags []string, text string) error {
 		}
 	}
 	return nil
+}
+
+// SaveWorkStart は始業エントリを特別なタグ「始業」と共にログに保存します。
+// offsetMinutes: 記録時刻を現在時刻から遡及調整するオフセット値（分）
+func (a *App) SaveWorkStart(offsetMinutes int) error {
+	if a.logger == nil {
+		return fmt.Errorf("app not initialised")
+	}
+	t := time.Now().Add(time.Duration(offsetMinutes) * time.Minute)
+	entry := LogEntry{
+		Timestamp: t.Format("2006-01-02 15:04"),
+		Tags:      []string{"始業"},
+		Text:      "始業",
+	}
+	// tagsManager.Add("始業") は呼ばないため、サジェスト候補には追加されません。
+	return a.logger.Append(entry)
 }
 
 // GetRecentLogs returns the latest recentLogLimit log entries for the chat history view.
