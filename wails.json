@@ -9,5 +9,12 @@
   "author": {
     "name": "tfuruha",
     "email": "itsuki.f@gmail.com"
+  },
+  "info": {
+    "companyName": "tfuruha",
+    "productName": "TaskmemoLogger",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2026 tfuruha",
+    "comments": "TaskmemoLogger Application"
   }
 }
