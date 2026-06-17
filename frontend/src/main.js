@@ -70,8 +70,12 @@ async function loadTodayLogs() {
  * @param {Array<{tags: string[]}>} entries 
  */
 function applyWorkStartGuard(entries) {
+  // ローカル日付を "YYYY-MM-DD" 形式で取得する。
+  // toISOString() は UTC を返すため JST では 0:00〜8:59 に日付がずれる。
+  // formatDateToTimestamp() はローカル時刻を使用するため、その先頭10文字を流用する。
+  const today = formatDateToTimestamp(new Date()).slice(0, 10);
   const alreadyStarted = entries.some(
-    e => e.tags && e.tags.includes('始業')
+    e => e.tags && e.tags.includes('始業') && e.timestamp.startsWith(today)
   );
   if (alreadyStarted) {
     workStartBtn.disabled = true;
