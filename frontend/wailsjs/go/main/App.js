@@ -14,6 +14,10 @@ export function GetTagSuggestions(arg1) {
   return window['go']['main']['App']['GetTagSuggestions'](arg1);
 }
 
+export function HasWorkStartToday() {
+  return window['go']['main']['App']['HasWorkStartToday']();
+}
+
 export function SaveLog(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveLog'](arg1, arg2, arg3);
 }

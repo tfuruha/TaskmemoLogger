@@ -8,6 +8,8 @@ export function GetRecentLogs():Promise<Array<main.LogEntry>>;
 
 export function GetTagSuggestions(arg1:string):Promise<Array<string>>;
 
+export function HasWorkStartToday():Promise<boolean>;
+
 export function SaveLog(arg1:Array<string>,arg2:string,arg3:number):Promise<void>;
 
 export function SaveWorkStart(arg1:number):Promise<void>;

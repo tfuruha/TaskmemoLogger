@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -107,6 +108,27 @@ func (a *App) SaveWorkStart(offsetMinutes int) error {
 	// tagsManager.Add("始業") は呼ばないため、サジェスト候補には追加されません。
 	return a.logger.Append(entry)
 }
+
+// HasWorkStartToday は、本日すでに「始業」エントリが登録されているかを判定します。
+func (a *App) HasWorkStartToday() (bool, error) {
+	if a.logger == nil {
+		return false, fmt.Errorf("app not initialised")
+	}
+	entries, err := a.logger.ReadToday()
+	if err != nil {
+		return false, err
+	}
+	today := time.Now().Format("2006-01-02")
+	for _, e := range entries {
+		for _, tag := range e.Tags {
+			if tag == "始業" && strings.HasPrefix(e.Timestamp, today) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 
 // GetRecentLogs returns the latest recentLogLimit log entries for the chat history view.
 func (a *App) GetRecentLogs() ([]LogEntry, error) {

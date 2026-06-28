@@ -355,3 +355,39 @@ func TestApp_SaveWorkStart(t *testing.T) {
 		t.Errorf("text mismatch: want %q, got %q", "始業", entries[0].Text)
 	}
 }
+
+func TestApp_HasWorkStartToday(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := NewTaskLogger(tmpDir)
+	tagsMgr, _ := NewTagsManager(tmpDir)
+
+	app := &App{
+		logger:      logger,
+		tagsManager: tagsMgr,
+	}
+
+	// 初期状態は false であること
+	hasStart, err := app.HasWorkStartToday()
+	if err != nil {
+		t.Fatalf("HasWorkStartToday failed: %v", err)
+	}
+	if hasStart {
+		t.Error("expected false, got true")
+	}
+
+	// 始業を保存
+	err = app.SaveWorkStart(0)
+	if err != nil {
+		t.Fatalf("SaveWorkStart failed: %v", err)
+	}
+
+	// 始業保存後は true になること
+	hasStart, err = app.HasWorkStartToday()
+	if err != nil {
+		t.Fatalf("HasWorkStartToday failed: %v", err)
+	}
+	if !hasStart {
+		t.Error("expected true, got false")
+	}
+}
+
