@@ -35,7 +35,8 @@ func (a *App) startup(ctx context.Context) {
 
 	// Log directory: %USERPROFILE%\Documents\TaskmemoLogger\log
 	logDir := filepath.Join(home, "Documents", "TaskmemoLogger", "log")
-	a.logger, err = NewTaskLogger(logDir)
+	configDir := filepath.Join(home, "Documents", "TaskmemoLogger")
+	a.logger, err = NewTaskLogger(logDir, configDir)
 	if err != nil {
 		fmt.Println("Error initialising logger:", err)
 	}

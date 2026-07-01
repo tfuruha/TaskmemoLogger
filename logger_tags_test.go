@@ -13,7 +13,7 @@ import (
 
 func TestTaskLogger_AppendAndReadToday(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, err := NewTaskLogger(tmpDir)
+	logger, err := NewTaskLogger(tmpDir, tmpDir)
 	if err != nil {
 		t.Fatalf("NewTaskLogger: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestTaskLogger_AppendAndReadToday(t *testing.T) {
 
 func TestTaskLogger_MultilineText(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 
 	entry := LogEntry{
 		Timestamp: time.Now().Format("2006-01-02 15:04"),
@@ -74,7 +74,7 @@ func TestTaskLogger_MultilineText(t *testing.T) {
 
 func TestTaskLogger_EmptyLogFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 
 	entries, err := logger.ReadToday()
 	if err != nil {
@@ -178,7 +178,7 @@ func TestTagsManager_EmptyTag(t *testing.T) {
 
 func TestTaskLogger_ReadRecent_CurrentMonthOnly(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 
 	now := time.Now()
 	for i := 0; i < 5; i++ {
@@ -200,7 +200,7 @@ func TestTaskLogger_ReadRecent_CurrentMonthOnly(t *testing.T) {
 
 func TestTaskLogger_ReadRecent_LimitApplied(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 
 	now := time.Now()
 	for i := 0; i < 25; i++ {
@@ -227,7 +227,7 @@ func TestTaskLogger_ReadRecent_LimitApplied(t *testing.T) {
 
 func TestTaskLogger_ReadRecent_CrossMonth(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 
 	now := time.Now()
 	prevMonth := now.AddDate(0, -1, 0)
@@ -265,7 +265,7 @@ func TestTaskLogger_ReadRecent_CrossMonth(t *testing.T) {
 
 func TestTaskLogger_ReadRecent_Empty(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 
 	entries, err := logger.ReadRecent(recentLogLimit)
 	if err != nil {
@@ -292,7 +292,7 @@ func appendToPath(path, timestamp, text string) error {
 
 func TestApp_SaveLogWithOffset(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 	tagsMgr, _ := NewTagsManager(tmpDir)
 
 	app := &App{
@@ -322,7 +322,7 @@ func TestApp_SaveLogWithOffset(t *testing.T) {
 
 func TestApp_SaveWorkStart(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 	tagsMgr, _ := NewTagsManager(tmpDir)
 
 	app := &App{
@@ -358,7 +358,7 @@ func TestApp_SaveWorkStart(t *testing.T) {
 
 func TestApp_HasWorkStartToday(t *testing.T) {
 	tmpDir := t.TempDir()
-	logger, _ := NewTaskLogger(tmpDir)
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
 	tagsMgr, _ := NewTagsManager(tmpDir)
 
 	app := &App{
@@ -388,6 +388,83 @@ func TestApp_HasWorkStartToday(t *testing.T) {
 	}
 	if !hasStart {
 		t.Error("expected true, got false")
+	}
+}
+
+func TestTaskLogger_YAMLHeader(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// 独自の config.json を作成
+	configContent := `{
+		"rules": [
+			"このファイルは{year}年{month}月のタスクログです。",
+			"工数は15分単位（0.25時間単位）に丸めて集計すること。"
+		],
+		"summary_template": "### 集計出力\n- 工数要約"
+	}`
+	configPath := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config.json: %v", err)
+	}
+
+	logger, err := NewTaskLogger(tmpDir, tmpDir)
+	if err != nil {
+		t.Fatalf("NewTaskLogger: %v", err)
+	}
+
+	now := time.Now()
+	entry := LogEntry{
+		Timestamp: now.Format("2006-01-02 15:04"),
+		Tags:      []string{"テスト"},
+		Text:      "YAMLヘッダ書き込みテスト",
+	}
+
+	if err := logger.Append(entry); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+
+	// ログファイルの直接的な読み込み
+	month := now.Format("2006-01")
+	filePath := filepath.Join(tmpDir, month+"_log.md")
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("failed to read log file: %v", err)
+	}
+	content := string(data)
+
+	// YAMLヘッダの内容検証
+	expectedHeaderStart := "---\n"
+	expectedMonthLine := fmt.Sprintf("target_month: %s-%s\n", now.Format("2006"), now.Format("01"))
+	expectedRule1 := fmt.Sprintf("このファイルは%s年%s月のタスクログです。", now.Format("2006"), now.Format("01"))
+	expectedRule2 := "工数は15分単位（0.25時間単位）に丸めて集計すること。"
+	expectedTemplate := "  ### 集計出力\n  - 工数要約"
+
+	if !strings.HasPrefix(content, expectedHeaderStart) {
+		t.Errorf("expected header to start with '---\\n', got:\n%s", content)
+	}
+	if !strings.Contains(content, expectedMonthLine) {
+		t.Errorf("expected target_month line: %q, got:\n%s", expectedMonthLine, content)
+	}
+	if !strings.Contains(content, expectedRule1) {
+		t.Errorf("expected rule1 containing replaced date: %q, got:\n%s", expectedRule1, content)
+	}
+	if !strings.Contains(content, expectedRule2) {
+		t.Errorf("expected rule2: %q, got:\n%s", expectedRule2, content)
+	}
+	if !strings.Contains(content, expectedTemplate) {
+		t.Errorf("expected template: %q, got:\n%s", expectedTemplate, content)
+	}
+
+	// YAMLヘッダがパース時に無視され、ログエントリが正常に取得できるか確認
+	entries, err := logger.ReadToday()
+	if err != nil {
+		t.Fatalf("ReadToday: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Text != "YAMLヘッダ書き込みテスト" {
+		t.Errorf("expected text: %q, got %q", "YAMLヘッダ書き込みテスト", entries[0].Text)
 	}
 }
 

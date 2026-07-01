@@ -23,15 +23,16 @@ type LogEntry struct {
 
 // TaskLogger handles file I/O for Markdown task logs.
 type TaskLogger struct {
-	logDir string
+	logDir    string
+	configDir string
 }
 
 // NewTaskLogger creates a TaskLogger. logDir is %USERPROFILE%\Documents\TaskmemoLogger\log.
-func NewTaskLogger(logDir string) (*TaskLogger, error) {
+func NewTaskLogger(logDir string, configDir string) (*TaskLogger, error) {
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
-	return &TaskLogger{logDir: logDir}, nil
+	return &TaskLogger{logDir: logDir, configDir: configDir}, nil
 }
 
 // logFilePath returns the current month's log file path.
@@ -44,6 +45,48 @@ func (l *TaskLogger) logFilePathFor(t time.Time) string {
 	return filepath.Join(l.logDir, t.Format("2006-01")+"_log.md")
 }
 
+// generateYAMLHeader は、現在設定されている集計ルールに基づきYAML形式のヘッダを生成します。
+func (l *TaskLogger) generateYAMLHeader(t time.Time) (string, error) {
+	config, err := LoadConfig(l.configDir)
+	if err != nil {
+		// 設定読み込みエラー時は、ログの保存自体を阻害しないよう最小限のルールでフォールバックします
+		config = &AppConfig{
+			Rules: []string{"時刻はタスク終了を示すこと。"},
+		}
+	}
+
+	year := t.Format("2006")
+	month := t.Format("01")
+
+	var sb strings.Builder
+	sb.WriteString("---\n")
+	sb.WriteString(fmt.Sprintf("target_month: %s-%s\n", year, month))
+
+	if len(config.Rules) > 0 {
+		sb.WriteString("rules:\n")
+		for _, rule := range config.Rules {
+			r := strings.ReplaceAll(rule, "{year}", year)
+			r = strings.ReplaceAll(r, "{month}", month)
+			sb.WriteString(fmt.Sprintf("  - %q\n", r))
+		}
+	}
+
+	if config.SummaryTemplate != "" {
+		sb.WriteString("summary_template: |\n")
+		lines := strings.Split(config.SummaryTemplate, "\n")
+		for _, line := range lines {
+			if line == "" {
+				sb.WriteString("\n")
+			} else {
+				sb.WriteString(fmt.Sprintf("  %s\n", line))
+			}
+		}
+	}
+
+	sb.WriteString("---\n")
+	return sb.String(), nil
+}
+
 // Append writes a new LogEntry to the Markdown log file.
 // Format (compatible with Python version):
 //
@@ -51,11 +94,24 @@ func (l *TaskLogger) logFilePathFor(t time.Time) string {
 //	- [タグ1] [タグ2]
 //	- タスク内容
 func (l *TaskLogger) Append(entry LogEntry) error {
-	f, err := os.OpenFile(l.logFilePath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	path := l.logFilePath()
+	_, err := os.Stat(path)
+	isNew := os.IsNotExist(err)
+
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
 	defer f.Close()
+
+	if isNew {
+		header, err := l.generateYAMLHeader(time.Now())
+		if err == nil && header != "" {
+			if _, err := f.WriteString(header); err != nil {
+				return fmt.Errorf("failed to write header: %w", err)
+			}
+		}
+	}
 
 	// Build tag string: [タグ1] [タグ2]
 	tagLine := ""

@@ -14,14 +14,16 @@
 │  Go バックエンド                                      │
 │  app.go (バインディング層 + ライフサイクルフック)      │
 │    ├── logger.go        (ファイル I/O 層)             │
-│    └── tags_manager.go  (タグ永続化層)                │
+│    ├── tags_manager.go  (タグ永続化層)                │
+│    └── config_manager.go (設定管理層)                  │
 │  focus_windows.go       (Win32 フォーカス制御)        │
 │  single_instance.go     (Windows Mutex ロック)        │
 │  main.go                (エントリポイント)            │
 └─────────────────────────────────────────────────────┘
-         ↓ 書き込み
-%USERPROFILE%\Documents\TaskmemoLogger\log\YYYY-MM_log.md
+         ↓ 読み書き
+%USERPROFILE%\Documents\TaskmemoLogger\config.json
 %USERPROFILE%\Documents\TaskmemoLogger\tags.json
+%USERPROFILE%\Documents\TaskmemoLogger\log\YYYY-MM_log.md
 ```
 
 ## 2. ファイル別・クラス別構成
@@ -51,6 +53,19 @@
 
 `startup()` で `os.UserHomeDir()` からパスを確定し、`TaskLogger` と `TagsManager` を初期化する。
 
+### `config_manager.go` — 設定管理層
+
+```go
+type AppConfig struct {
+    Rules           []string `json:"rules"`
+    SummaryTemplate string   `json:"summary_template"`
+}
+
+func LoadConfig(dir string) (*AppConfig, error) // 設定読み込み。不在時はデフォルト生成
+```
+
+- `LoadConfig()`: `%USERPROFILE%\Documents\TaskmemoLogger\config.json` をロードする。ファイルが存在しない場合は、丸め・除外ルールなどを含めたデフォルト設定を自動生成して保存する。パースエラーなどの例外時は、ログ機能自体の停止を防ぐため最小限のルールにフォールバックする。
+
 ### `logger.go` — ファイル I/O 層
 
 ```go
@@ -62,16 +77,23 @@ type LogEntry struct {
     Text      string   `json:"text"`
 }
 
-type TaskLogger struct { logDir string }
+type TaskLogger struct {
+    logDir    string
+    configDir string
+}
 
+func NewTaskLogger(logDir string, configDir string) (*TaskLogger, error)
 func (l *TaskLogger) Append(entry LogEntry) error              // O_APPEND でファイルに追記
+func (l *TaskLogger) generateYAMLHeader(t time.Time) (string, error) // YAML形式の集計メタヘッダ生成
 func (l *TaskLogger) readAllFromFile(path string) ([]LogEntry, error) // 指定ファイルの全エントリを解析
 func (l *TaskLogger) ReadToday() ([]LogEntry, error)           // 当月ファイルから当日分のみ返す
 func (l *TaskLogger) ReadRecent(n int) ([]LogEntry, error)     // 当月・前月から最新 n 件を返す
 ```
 
-- `Append()`: `os.O_APPEND | os.O_CREATE | os.O_WRONLY` で開いて追記する
-- `readAllFromFile()`: 正規表現で `## YYYY-MM-DD HH:MM` ヘッダーを検出し、ファイル内の全エントリを返す（ファイル不在時は空スライス）
+- `NewTaskLogger()`: ログ出力ディレクトリに加え、設定ファイル読み込み用の `configDir` を引数に取るよう拡張。
+- `Append()`: `os.O_APPEND | os.O_CREATE | os.O_WRONLY` で開く。新規ファイル生成時（ファイル不在時）にのみ、`generateYAMLHeader` を呼び出して YAML ヘッダをファイル先頭に挿入する。
+- `generateYAMLHeader()`: 設定ファイルからルールと集計テンプレートをロードし、`{year}` と `{month}` を対象年月に置換した YAML ヘッダブロックを構築する。
+- `readAllFromFile()`: 正規表現で `## YYYY-MM-DD HH:MM` ヘッダーを検出し、ファイル内の全エントリを返す（ファイル不在時は空スライス）。ファイル先頭の YAML ヘッダ行は最初のログヘッダが出現するまで安全にスキップされる。
 - `ReadToday()`: `readAllFromFile()` の結果を当日日付でフィルタするラッパー
 - `ReadRecent(n)`: 当月ファイル → 前月ファイルの順に読み込み、合計 n 件を返す（不足時は全件返す）
 - Markdown フォーマットは Python 版と完全互換（既存ログを壊さない）
@@ -201,8 +223,9 @@ TaskmemoLogger/
 ├── focus_windows.go         Win32 API による WebView2 フォーカス強制制御
 ├── logger.go                Markdown ファイル I/O
 ├── tags_manager.go          tags.json 永続化・前方一致検索
+├── config_manager.go        config.json 永続化・デフォルト生成
 ├── single_instance.go       Windows 名前付き Mutex によるシングルインスタンス制御
-├── logger_tags_test.go      Go ユニットテスト（12ケース）
+├── logger_tags_test.go      Go ユニットテスト（16ケース）
 ├── wails.json               Wails プロジェクト設定
 ├── go.mod / go.sum          Go モジュール
 ├── frontend/
@@ -238,9 +261,10 @@ TaskmemoLogger/
 
 ```
 %USERPROFILE%\Documents\TaskmemoLogger\
+  ├── config.json     ← 工数集計ルール設定（AI用）
   ├── tags.json       ← タグ永続化
   └── log\
-        └── YYYY-MM_log.md  ← タスクログ（月別）
+        └── YYYY-MM_log.md  ← タスクログ（月別、先頭に YAML ヘッダ付）
 ```
 
 ### なぜ tags.json を `os.Rename()` で原子的に書くか
@@ -327,6 +351,7 @@ JS 側は `EventsOn('app:ready-focus')` を受けて
 | `TestTaskLogger_ReadRecent_LimitApplied` | 25件中 `recentLogLimit` 件に切り詰められること |
 | `TestTaskLogger_ReadRecent_CrossMonth` | 当月3件 + 前月5件 = 合計8件の月跨ぎ取得 |
 | `TestTaskLogger_ReadRecent_Empty` | ログなし時に空スライスを返すこと |
+| `TestTaskLogger_YAMLHeader` | 設定ファイルに基づき、新月ファイル作成時にYAMLヘッダが出力され、パース時に正しくスキップされること |
 
 ```bash
 # 実行コマンド
