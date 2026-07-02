@@ -48,7 +48,7 @@
 | `SaveLog` | `tags []string, text string, offsetMinutes int` | `error` | オフセット時刻で Markdown 追記 + 新規タグ保存 |
 | `SaveWorkStart` | `offsetMinutes int` | `error` | 特別タグ「始業」をオフセット時刻で Markdown 追記 |
 | `GetRecentLogs` | なし | `[]LogEntry, error` | 直近 `recentLogLimit` 件のログ読み取り |
-| `GetTagSuggestions` | `prefix string` | `[]string` | 前方一致タグ候補 |
+| `GetTagSuggestions` | `prefix string` | `[]string` | タグ候補（空指定時は config.json の優先タグ、文字入力時は前方一致候補） |
 | `AddTag` | `tag string` | `error` | タグの単独追加 |
 
 `startup()` で `os.UserHomeDir()` からパスを確定し、`TaskLogger` と `TagsManager` を初期化する。
@@ -59,6 +59,7 @@
 type AppConfig struct {
     Rules           []string `json:"rules"`
     SummaryTemplate string   `json:"summary_template"`
+    PriorityTags    []string `json:"priority_tags"`
 }
 
 func LoadConfig(dir string) (*AppConfig, error) // 設定読み込み。不在時はデフォルト生成

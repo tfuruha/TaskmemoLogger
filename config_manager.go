@@ -9,6 +9,7 @@ import (
 type AppConfig struct {
 	Rules           []string `json:"rules"`
 	SummaryTemplate string   `json:"summary_template"`
+	PriorityTags    []string `json:"priority_tags"`
 }
 
 // LoadConfig は設定ファイルを読み込みます。ファイルが存在しない場合はデフォルト設定を自動生成して保存します。
@@ -30,6 +31,7 @@ func LoadConfig(dir string) (*AppConfig, error) {
 				"「[休憩]」または「[私用]」タグが含まれるタスクは、工数集計の対象外とすること。",
 			}
 			config.SummaryTemplate = "以下のフォーマットで出力してください：\n### 1. タグ別工数集計\n- [タグ名]: XX時間 (全体に対する割合%)\n### 2. 主な業務成果の要約\n- [タグ名]: 業務の要約と成果"
+			config.PriorityTags = []string{}
 
 			newData, err := json.MarshalIndent(config, "", "  ")
 			if err == nil {

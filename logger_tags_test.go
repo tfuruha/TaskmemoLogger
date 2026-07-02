@@ -468,3 +468,46 @@ func TestTaskLogger_YAMLHeader(t *testing.T) {
 	}
 }
 
+func TestApp_GetTagSuggestions_PriorityTags(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := NewTaskLogger(tmpDir, tmpDir)
+	tagsMgr, _ := NewTagsManager(tmpDir)
+
+	// 優先タグを含む config.json を作成
+	configContent := `{
+		"rules": [],
+		"summary_template": "",
+		"priority_tags": ["ProjA", "ProjB"]
+	}`
+	configPath := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config.json: %v", err)
+	}
+
+	app := &App{
+		logger:      logger,
+		tagsManager: tagsMgr,
+	}
+
+	config, err := LoadConfig(tmpDir)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	app.config = config
+
+	// 通常のタグを追加
+	tagsMgr.Add("RegularTag")
+	tagsMgr.Add("ProjA_extra")
+
+	// 1. プレフィックスが空の場合、優先タグが返されること
+	suggsEmpty := app.GetTagSuggestions("")
+	if len(suggsEmpty) != 2 || suggsEmpty[0] != "ProjA" || suggsEmpty[1] != "ProjB" {
+		t.Errorf("expected priority tags [ProjA, ProjB], got %v", suggsEmpty)
+	}
+
+	// 2. プレフィックスがある場合、通常の検索（前方一致）が機能すること
+	suggsPrefix := app.GetTagSuggestions("Proj")
+	if len(suggsPrefix) != 1 || suggsPrefix[0] != "ProjA_extra" {
+		t.Errorf("expected prefixed tag [ProjA_extra], got %v", suggsPrefix)
+	}
+}

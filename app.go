@@ -16,6 +16,7 @@ type App struct {
 	ctx         context.Context
 	logger      *TaskLogger
 	tagsManager *TagsManager
+	config      *AppConfig
 }
 
 // NewApp creates a new App application struct.
@@ -46,6 +47,12 @@ func (a *App) startup(ctx context.Context) {
 	a.tagsManager, err = NewTagsManager(tagsDir)
 	if err != nil {
 		fmt.Println("Error initialising tags manager:", err)
+	}
+
+	a.config, err = LoadConfig(configDir)
+	if err != nil {
+		fmt.Println("Error loading config:", err)
+		a.config = &AppConfig{PriorityTags: []string{}}
 	}
 }
 
@@ -140,9 +147,16 @@ func (a *App) GetRecentLogs() ([]LogEntry, error) {
 }
 
 // GetTagSuggestions returns tags matching the given prefix.
+// If the prefix is empty, it returns the priority tags from config.json.
+// If there are no priority tags, it falls back to all tags.
 func (a *App) GetTagSuggestions(prefix string) []string {
 	if a.tagsManager == nil {
 		return []string{}
+	}
+	if prefix == "" {
+		if a.config != nil && len(a.config.PriorityTags) > 0 {
+			return a.config.PriorityTags
+		}
 	}
 	return a.tagsManager.GetSuggestions(prefix)
 }

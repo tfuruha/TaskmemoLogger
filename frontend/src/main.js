@@ -186,10 +186,21 @@ function renderPills() {
 }
 
 // ── Tag suggestion logic ──────────────────────────────────────────────────────
+async function checkAndShowBlankSuggestions() {
+  const prefix = tagInput.value.trim();
+  if (prefix !== '') return;
+
+  const rawSuggestions = await GetTagSuggestions('');
+  suggestions = rawSuggestions.filter(
+    s => !selectedTags.some(t => t.toLowerCase() === s.toLowerCase())
+  );
+  showSuggestions(suggestions);
+}
+
 tagInput.addEventListener('input', async () => {
   const prefix = tagInput.value.trim();
   if (prefix === '') {
-    hideSuggestions();
+    await checkAndShowBlankSuggestions();
     return;
   }
   suggestions = await GetTagSuggestions(prefix);
@@ -198,6 +209,10 @@ tagInput.addEventListener('input', async () => {
     s => !selectedTags.some(t => t.toLowerCase() === s.toLowerCase())
   );
   showSuggestions(suggestions);
+});
+
+tagInput.addEventListener('focus', async () => {
+  await checkAndShowBlankSuggestions();
 });
 
 tagInput.addEventListener('keydown', e => {
